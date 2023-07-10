@@ -37,8 +37,7 @@ def identify_divergences(stock, timeframe):
             rsi_peaks.append(rsi_info)
         elif rsi[0][i] < rsi[0][i - 1 ] and rsi[0][i] < rsi[0][i + 1]:
             rsi_valleys.append(rsi_info)
-    bullish = []
-    bearish = []
+    divergences = []
     for i in range(1, len(stock_peaks)):
         if (stock_peaks[i].get('Price') > stock_peaks[i - 1].get('Price')) and (rsi_peaks[i].get('RSI') < rsi_peaks[i - 1].get('RSI')):
             divergence = {
@@ -47,9 +46,10 @@ def identify_divergences(stock, timeframe):
                 'Start Price': stock_peaks[i - 1].get('Price'),
                 'End Price': stock_peaks[i].get('Price'),
                 'Start RSI': rsi_peaks[i - 1].get('RSI'),
-                'End RSI': rsi_peaks[i].get('RSI')
+                'End RSI': rsi_peaks[i].get('RSI'),
+                'Flag': -1
             }
-            bearish.append(divergence)
+            divergences.append(divergence)
     for i in range(1, len(stock_valleys)):
         if (stock_valleys[i].get('Price') < stock_valleys[i - 1].get('Price')) and (rsi_valleys[i].get('RSI') > rsi_valleys[i - 1].get('RSI')):
             divergence = {
@@ -58,16 +58,17 @@ def identify_divergences(stock, timeframe):
                 'Start Price': stock_valleys[i - 1].get('Price'),
                 'End Price': stock_valleys[i].get('Price'),
                 'Start RSI': rsi_valleys[i - 1].get('RSI'),
-                'End RSI': rsi_valleys[i].get('RSI')
+                'End RSI': rsi_valleys[i].get('RSI'),
+                'Flag' : 1
             }
-            bullish.append(divergence)
-    return df, rsi, bullish, bearish
+            divergences.append(divergence)
+    return df, rsi, divergences
 
 
 user_input = input("Enter Stock: ")
 time = int(input("Enter number of years: "))
 
-df, rsi, bullish, bearish = identify_divergences(user_input, time)
+df, rsi, divergences = identify_divergences(user_input, time)
 sns.set_style("ticks")
 sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
 sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
