@@ -65,13 +65,14 @@ def identify_divergences(stock, timeframe):
     return df, rsi, divergences
 
 
+def plot_graph(stock, time):
+    df, rsi, divergences = identify_divergences(stock, time)
+    sns.set_style("ticks")
+    sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
+    sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
+    sns.despine()
+    plt.show()
+
 user_input = input("Enter Stock: ")
 time = int(input("Enter number of years: "))
-
-df, rsi, divergences = identify_divergences(user_input, time)
-sns.set_style("ticks")
-sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
-sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
-sns.despine()
-plt.show()
-
+plot_graph(user_input, time)
