@@ -5,7 +5,8 @@ import seaborn as sns
 import yfinance as yf
 import math
 
-fig, ax = plt.subplots(2, 1)
+fig, ax = plt.subplots(1, 1)
+sns.set_style("ticks")
 
 
 def identify_divergences(stock, timeframe):
@@ -65,14 +66,33 @@ def identify_divergences(stock, timeframe):
     return df, rsi, divergences
 
 
-def plot_graph(stock, time):
-    df, rsi, divergences = identify_divergences(stock, time)
-    sns.set_style("ticks")
-    sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
-    sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
-    sns.despine()
-    plt.show()
-
+def calc_return(df, divergence):
+    i = 0
+    while divergence.get('End') != df.index[i].strftime('%Y-%m-%d'):
+        i += 1
+    days = []
+    returns = []
+    for j in range(1, 22):
+        if(i + j < len(df['Close'])):
+            ret = df['Close'][i + j] - divergence.get('End Price')
+            returns.append(ret)
+            days.append(j)
+        else:
+            break
+    div_curve = {
+        'Days after Divergence': days,
+        'Return': returns
+    }
+    return div_curve
+    
 user_input = input("Enter Stock: ")
 time = int(input("Enter number of years: "))
-plot_graph(user_input, time)
+df, rsi, divergences = identify_divergences(user_input, time)
+# sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
+# sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
+div_curve = calc_return(df, divergences[0])
+df_curve = pd.DataFrame(div_curve)
+print(divergences[0].get('Flag'))
+sns.lineplot(data=df_curve, x='Days after Divergence', y='Return', color='firebrick')
+sns.despine()
+plt.show()
