@@ -5,12 +5,16 @@ import seaborn as sns
 import yfinance as yf
 import math
 
+#ADD DOCUMENTATION
+
+# Change subplot numbers to have however many graphs as needed 
+# First number increases subplots in rows, second number increases subplots in columns
 fig, ax = plt.subplots(1, 1)
 sns.set_style("ticks")
 
 
-def identify_divergences(stock, timeframe):
-    df = yf.download(tickers=stock, start=str(2023 - timeframe) + '-6-15', end='2023-6-16')
+def identify_divergences(stock, start_date):
+    df = yf.download(tickers=stock, start=start_date, end='2023-6-16')
     rsi = pd.DataFrame(talib.RSI(df['Close']))
     stock_peaks = []
     stock_valleys = []
@@ -74,25 +78,34 @@ def calc_return(df, divergence):
     returns = []
     for j in range(1, 22):
         if(i + j < len(df['Close'])):
-            ret = df['Close'][i + j] - divergence.get('End Price')
+            ret = (df['Close'][i + j] - divergence.get('End Price')) * divergence.get('Flag')
             returns.append(ret)
             days.append(j)
         else:
             break
     div_curve = {
         'Days after Divergence': days,
-        'Return': returns
+        'Buy Return': returns,
+        'Sell Return': returns
     }
     return div_curve
     
 user_input = input("Enter Stock: ")
-time = int(input("Enter number of years: "))
-df, rsi, divergences = identify_divergences(user_input, time)
-# sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
-# sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
-div_curve = calc_return(df, divergences[0])
+start = input("Enter Start Date: ")
+#End date is set to June 16th 2023 (can change if necessary)
+df, rsi, divergences = identify_divergences(user_input, start)
+
+div_curve = calc_return(df, divergences[1])
 df_curve = pd.DataFrame(div_curve)
-print(divergences[0].get('Flag'))
-sns.lineplot(data=df_curve, x='Days after Divergence', y='Return', color='firebrick')
+if divergences[1].get('Flag') == 1:
+    sns.lineplot(data=df_curve, x='Days after Divergence', y='Buy Return', color='firebrick')
+else:
+    sns.lineplot(data=df_curve, x='Days after Divergence', y='Sell Return', color='firebrick')
+
+
+# Uncomment to Displays Date vs Stock Price on Closing
+# sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
+# Uncomment to Displays Date vs RSI Value
+# sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
 sns.despine()
 plt.show()
