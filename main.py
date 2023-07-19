@@ -1,11 +1,10 @@
+#All imports necessary
 import matplotlib.pyplot as plt
 import pandas as pd
 import talib
 import seaborn as sns
-import yfinance as yf
 import math
 
-#ADD DOCUMENTATION
 
 # Change subplot numbers to have however many graphs as needed 
 # First number increases subplots in rows, second number increases subplots in columns
@@ -13,10 +12,7 @@ fig, ax = plt.subplots(2, 1)
 sns.set_style("ticks")
 data = pd.read_csv('price_godbole.csv')
 
-def stock_list():
-    stocks = data['Unnamed: 0'][2:len(data['Unnamed: 0'])]
-    return stocks
-
+# Gets all  stock prices and dates and makes a pandas dataframe
 def get_stock_info(stock):
     info = data.values.tolist()
     dates = []
@@ -29,13 +25,15 @@ def get_stock_info(stock):
             stock_price = info[num][1:len(info[num])]
             for j in range(len(stock_price)):
                 stock_price[j] = float(stock_price[j])
+            dates = dates[::-1]
+            stock_price = stock_price[::-1]
             df = pd.DataFrame({
                 'Date': dates,
                 'Close': stock_price
             })
             return df
      
-
+# Finds Divergences by finding local maxima and minima of both the stock price and RSI, and then returns divergences that are bullish ('Flag': 1) and bearish ('Flag': -1)
 def identify_divergences(stock):
     df = get_stock_info(stock)
     rsi = pd.DataFrame({
@@ -52,7 +50,7 @@ def identify_divergences(stock):
             'Price': df['Close'][i]
         }
         if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
-            i += 1
+            continue
         elif df['Close'][i] > df['Close'][i - 1] and df['Close'][i] > df['Close'][i + 1]:
             stock_peaks.append(stock_info)
         elif df['Close'][i] < df['Close'][i - 1] and df['Close'][i] < df['Close'][i + 1]:
@@ -63,7 +61,7 @@ def identify_divergences(stock):
             'RSI': rsi['RSI'][i]
         }
         if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
-            i += 1
+            continue
         elif rsi['RSI'][i] > rsi['RSI'][i - 1] and rsi['RSI'][i] > rsi['RSI'][i + 1]:
             rsi_peaks.append(rsi_info)
         elif rsi['RSI'][i] < rsi['RSI'][i - 1 ] and rsi['RSI'][i] < rsi['RSI'][i + 1]:
@@ -95,7 +93,7 @@ def identify_divergences(stock):
             divergences.append(divergence)
     return df, rsi, divergences
 
-
+# Given a divergence, calculates buy return (bullish) or sell return (bearish) in a 21 day span
 def calc_return(df, divergence):
     i = 0
     while divergence.get('End') != df['Date'][i]:
@@ -111,41 +109,35 @@ def calc_return(df, divergence):
             break
     div_curve = {
         'Days after Divergence': days,
-        'Buy Return': returns,
-        'Sell Return': returns
+        'Return': returns
     }
-    return div_curve, returns
-    
-#user_input = input("Enter Stock: ")
-#End date is set to June 16th 2023 (can change if necessary)
-#start = input("Enter Start Date: ")
-stocks = stock_list()
+    return div_curve
+
+#Asks a user for a stock and sets up counting and list variables that will be useful later
+user_input = input("Enter Stock: ")
 buy_returns = [0] * 21
-bcount = 0
+bcount = [0] * 21
 sell_returns = [0] * 21
-scount = 0
+scount = [0] * 21
 days = []
 
-for stock in stocks[1:20]:
-    df, rsi, divergences = identify_divergences(stock)
-    for div in range(len(divergences)):
-        div_curve, returns = calc_return(df, divergences[div])
-        
-        #df_curve = pd.DataFrame(div_curve)
-        for i in range(len(returns)): 
-            if divergences[div].get('Flag') == 1:
-                buy_returns[i] = buy_returns[i] + returns[i] 
-            else:
-                sell_returns[i] = sell_returns[i] + returns[i]
-        if divergences[div].get('Flag') == 1:
-            bcount += 1
+df, rsi, divergences = identify_divergences(user_input)
+
+# Takes all divergences found from user given stock and calculates mean buy and sell return for 21 days
+for divergence in divergences:
+    returns = calc_return(df, divergence)['Return']
+    for i in range(len(returns)):
+        if divergence['Flag'] == 1:
+                buy_returns[i] += returns[i] 
+                bcount[i] += 1
         else:
-            scount += 1
+                sell_returns[i] += returns[i]
+                scount[i] += 1
 
 for i in range(len(buy_returns)):
-    buy_returns[i] = buy_returns[i] / bcount
+    buy_returns[i] = buy_returns[i] / bcount[i]
 for i in range(len(sell_returns)):
-    sell_returns[i] = sell_returns[i] / scount
+    sell_returns[i] = sell_returns[i] / scount[i]
 for i in range(1, 22):
     days.append(i)
 
@@ -159,18 +151,14 @@ sell_df = pd.DataFrame({
     "Sell Return": sell_returns
 })
 
-#print(type(stock_list()[2]))
-# Uncomment to Graph Date vs Stock Price on Closing
-#sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
+# Uncomment to Graph Date vs Stock Price
+# sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
 # Uncomment to Graph Date vs RSI Value
-#sns.lineplot(data=rsi, x='Date', y=0, color='blue', ax=ax[1])
+# sns.lineplot(data=rsi, x='Date', y='RSI', color='blue', ax=ax[1])
+# (Make sure to double check subplot and axis values otherwise code will give an error)
 
-sns.lineplot(data=buy_df, x='Days after Divergence', y='Buy Return', color='firebrick', ax=ax[0])
-sns.lineplot(data=sell_df, x='Days after Divergence', y='Sell Return', color='firebrick', ax=ax[1])
+# Displays 2 graphs: Days after Divergence (21 total) vs Mean Buy Return graph and Days after Divergence (21 total) vs Mean Sell Return graph
+sns.lineplot(data=buy_df, x='Days after Divergence', y='Buy Return', marker = 'o', color='firebrick', ax=ax[0])
+sns.lineplot(data=sell_df, x='Days after Divergence', y='Sell Return', marker = 'o', color='firebrick', ax=ax[1])
 sns.despine()
 plt.show()
-
-# if divergences[0].get('Flag') == 1:
-#     sns.lineplot(data=df_curve, x='Days after Divergence', y='Buy Return', color='firebrick', ax = ax[2])
-# else:
-#     sns.lineplot(data=df_curve, x='Days after Divergence', y='Sell Return', color='firebrick', ax = ax[2])
