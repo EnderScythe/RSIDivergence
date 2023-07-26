@@ -4,6 +4,7 @@ import pandas as pd
 import talib
 import seaborn as sns
 import math
+import sys
 
 
 # Change subplot numbers to have however many graphs as needed 
@@ -32,40 +33,86 @@ def get_stock_info(stock):
                 'Close': stock_price
             })
             return df
+        
      
 # Finds Divergences by finding local maxima and minima of both the stock price and RSI, and then returns divergences that are bullish ('Flag': 1) and bearish ('Flag': -1)
-def identify_divergences(stock):
-    df = get_stock_info(stock)
+def identify_divergences(stock, period):
+    df_temp = get_stock_info(stock)
+    temp = talib.RSI(df_temp['Close'])
+    start = 0
+    end = 0
+    for i in range(len(temp)):
+        if math.isnan(temp[i]) is False:
+            start = i
+            break
+    temp = temp[::-1]
+    for i in range(len(temp)):
+        if math.isnan(temp[i]) is False:
+            end = len(temp) - i
+            break
+    temp = temp[::-1]
+    cleaned_rsi = temp[start:end+1]
+    df = pd.DataFrame({
+        'Date': df_temp['Date'][start:end+1],
+        'Close': df_temp['Close'][start:end+1]
+    })
     rsi = pd.DataFrame({
         'Date': df['Date'],
-        'RSI': talib.RSI(df['Close'])
+        'RSI': cleaned_rsi
         })
+    df.reset_index(drop=True, inplace=True)
+    rsi.reset_index(drop=True, inplace=True)
     stock_peaks = []
     stock_valleys = []
     rsi_peaks = []
     rsi_valleys = []
-    for i in range(1, len(df['Close']) - 1):
-        stock_info = {
-            'Date': df['Date'][i],
-            'Price': df['Close'][i]
-        }
-        if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
-            continue
-        elif df['Close'][i] > df['Close'][i - 1] and df['Close'][i] > df['Close'][i + 1]:
-            stock_peaks.append(stock_info)
-        elif df['Close'][i] < df['Close'][i - 1] and df['Close'][i] < df['Close'][i + 1]:
-            stock_valleys.append(stock_info)
-    for i in range(1, len(rsi['RSI']) - 1):
-        rsi_info = {
-            'Date': rsi['Date'][i],
-            'RSI': rsi['RSI'][i]
-        }
-        if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
-            continue
-        elif rsi['RSI'][i] > rsi['RSI'][i - 1] and rsi['RSI'][i] > rsi['RSI'][i + 1]:
-            rsi_peaks.append(rsi_info)
-        elif rsi['RSI'][i] < rsi['RSI'][i - 1 ] and rsi['RSI'][i] < rsi['RSI'][i + 1]:
-            rsi_valleys.append(rsi_info)
+    stock_date = ''
+    rsi_date = ''
+    maxima = sys.float_info.min
+    minima = sys.float_info.max
+    
+    for i in range(0, len(df['Close']), period):
+        for j in range(period):
+          if i + j < len(df['Close']):
+              if maxima < df['Close'][i + j]:
+                  maxima = df['Close'][i + j]
+              elif minima > df['Close'][i + j]:
+                  minima = df['Close'][i + j]
+              stock_date = df['Date'][i + j]
+          else:
+            break
+        stock_peaks.append({
+            'Date': stock_date,
+            'Price': maxima 
+        })
+        stock_valleys.append({
+            'Date': stock_date,
+            'Price': minima 
+        })
+        maxima = sys.float_info.min
+        minima = sys.float_info.max
+      
+    for i in range(0, len(rsi['RSI']), period):
+        for j in range(period):
+          if i + j < len(rsi['RSI']):
+              if maxima < rsi['RSI'][i + j]:
+                  maxima = rsi['RSI'][i + j]
+              elif minima > rsi['RSI'][i + j]:
+                  minima = rsi['RSI'][i + j]
+              rsi_date = rsi['Date'][i + j]
+          else:
+            break
+        rsi_peaks.append({
+            'Date': rsi_date,
+            'RSI': maxima 
+        })
+        rsi_valleys.append({
+            'Date': rsi_date,
+            'RSI': minima 
+        })
+        maxima = sys.float_info.min
+        minima = sys.float_info.max
+
     divergences = []
     for i in range(1, len(stock_peaks)):
         if (stock_peaks[i].get('Price') > stock_peaks[i - 1].get('Price')) and (rsi_peaks[i].get('RSI') < rsi_peaks[i - 1].get('RSI')):
@@ -115,13 +162,14 @@ def calc_return(df, divergence):
 
 #Asks a user for a stock and sets up counting and list variables that will be useful later
 user_input = input("Enter Stock: ")
+user_input2 = int(input('Enter Period (in days): '))
 buy_returns = [0] * 21
 bcount = [0] * 21
 sell_returns = [0] * 21
 scount = [0] * 21
-days = []
+days = list(range(1,  22))
 
-df, rsi, divergences = identify_divergences(user_input)
+df, rsi, divergences = identify_divergences(user_input, user_input2)
 
 # Takes all divergences found from user given stock and calculates mean buy and sell return for 21 days
 for divergence in divergences:
@@ -138,8 +186,6 @@ for i in range(len(buy_returns)):
     buy_returns[i] = buy_returns[i] / bcount[i]
 for i in range(len(sell_returns)):
     sell_returns[i] = sell_returns[i] / scount[i]
-for i in range(1, 22):
-    days.append(i)
 
 buy_df = pd.DataFrame({
     "Days after Divergence": days,
@@ -162,3 +208,64 @@ sns.lineplot(data=buy_df, x='Days after Divergence', y='Buy Return', marker = 'o
 sns.lineplot(data=sell_df, x='Days after Divergence', y='Sell Return', marker = 'o', color='firebrick', ax=ax[1])
 sns.despine()
 plt.show()
+
+
+# def identify_divergences(stock, period):
+#     df = get_stock_info(stock)
+#     rsi = pd.DataFrame({
+#         'Date': df['Date'],
+#         'RSI': talib.RSI(df['Close'])
+#         })
+#     stock_peaks = []
+#     stock_valleys = []
+#     rsi_peaks = []
+#     rsi_valleys = []
+    
+#     for i in range(1, len(df['Close']) - 1):
+#         stock_info = {
+#             'Date': df['Date'][i],
+#             'Price': df['Close'][i]
+#         }
+#         if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
+#             continue
+#         elif df['Close'][i] > df['Close'][i - 1] and df['Close'][i] > df['Close'][i + 1]:
+#             stock_peaks.append(stock_info)
+#         elif df['Close'][i] < df['Close'][i - 1] and df['Close'][i] < df['Close'][i + 1]:
+#             stock_valleys.append(stock_info)
+#     for i in range(1, len(rsi['RSI']) - 1):
+#         rsi_info = {
+#             'Date': rsi['Date'][i],
+#             'RSI': rsi['RSI'][i]
+#         }
+#         if math.isnan(rsi['RSI'][i - 1]) or math.isnan(rsi['RSI'][i + 1]) or math.isnan(rsi['RSI'][i]):
+#             continue
+#         elif rsi['RSI'][i] > rsi['RSI'][i - 1] and rsi['RSI'][i] > rsi['RSI'][i + 1]:
+#             rsi_peaks.append(rsi_info)
+#         elif rsi['RSI'][i] < rsi['RSI'][i - 1 ] and rsi['RSI'][i] < rsi['RSI'][i + 1]:
+#             rsi_valleys.append(rsi_info)
+#     divergences = []
+#     for i in range(1, len(stock_peaks)):
+#         if (stock_peaks[i].get('Price') > stock_peaks[i - 1].get('Price')) and (rsi_peaks[i].get('RSI') < rsi_peaks[i - 1].get('RSI')):
+#             divergence = {
+#                 'Start' : stock_peaks[i - 1].get('Date'),
+#                 'End' : stock_peaks[i].get('Date'),
+#                 'Start Price': stock_peaks[i - 1].get('Price'),
+#                 'End Price': stock_peaks[i].get('Price'),
+#                 'Start RSI': rsi_peaks[i - 1].get('RSI'),
+#                 'End RSI': rsi_peaks[i].get('RSI'),
+#                 'Flag': -1
+#             }
+#             divergences.append(divergence)
+#     for i in range(1, len(stock_valleys)):
+#         if (stock_valleys[i].get('Price') < stock_valleys[i - 1].get('Price')) and (rsi_valleys[i].get('RSI') > rsi_valleys[i - 1].get('RSI')):
+#             divergence = {
+#                 'Start': stock_valleys[i - 1].get('Date'),
+#                 'End': stock_valleys[i].get('Date'),
+#                 'Start Price': stock_valleys[i - 1].get('Price'),
+#                 'End Price': stock_valleys[i].get('Price'),
+#                 'Start RSI': rsi_valleys[i - 1].get('RSI'),
+#                 'End RSI': rsi_valleys[i].get('RSI'),
+#                 'Flag' : 1
+#             }
+#             divergences.append(divergence)
+#     return df, rsi, divergences
