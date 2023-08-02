@@ -4,6 +4,7 @@ import pandas as pd
 import talib
 import seaborn as sns
 import math
+import numpy as np
 import sys
 
 
@@ -30,20 +31,20 @@ def get_stock_info(stock):
             stock_price = stock_price[::-1]
             df = pd.DataFrame({
                 'Date': dates,
-                'Close': stock_price
+                'Close': stock_price,
+                'RSI': list(talib.RSI(np.array(stock_price)))
             })
             return df
-      
+
+#returns a list of all the stock names
 def get_stock_list():
     stock_list = []
     for i in range(2, len(info)):
         stock_list.append(info[i][0])
     return stock_list
-     
-# Finds Divergences by finding local maxima and minima of both the stock price and RSI, and then returns divergences that are bullish ('Flag': 1) and bearish ('Flag': -1)
-def identify_divergences(stock, period):
-    df_temp = get_stock_info(stock)
-    temp = talib.RSI(df_temp['Close'])
+
+#finds all nan values in a given list and returns the starting and ending points of actual values
+def find_nan(temp):
     start = 0
     end = 0
     for i in range(len(temp)):
@@ -55,18 +56,40 @@ def identify_divergences(stock, period):
         if math.isnan(temp[i]) is False:
             end = len(temp) - i
             break
-    temp = temp[::-1]
-    cleaned_rsi = temp[start:end+1]
+    return start, end
+
+#removes all nan values and restructures dataframe to have just the dates where the stock and rsi are not nan
+def clean_info(df):
+    m_start = 0
+    m_end = 0
+    s_start, s_end = find_nan(list(df['Close']))
+    rsi_start, rsi_end = find_nan(list(df['RSI']))
+    if s_start >= rsi_start:
+        m_start = s_start
+    else:
+        m_start = rsi_start
+    if s_end >= rsi_end:
+        m_end = rsi_end
+    else:
+        m_end = s_end
+    newdf = pd.DataFrame({
+        'Date': list(df['Date'][m_start:m_end]),
+        'Close': list(df['Close'][m_start:m_end]),
+        'RSI': list(df['RSI'][m_start:m_end])
+    })
+    return newdf
+
+# Finds Divergences by finding local maxima and minima of both the stock price and RSI, and then returns divergences that are bullish ('Flag': 1) and bearish ('Flag': -1)
+def identify_divergences(stock, period):
+    df_temp = clean_info(get_stock_info(stock))
     df = pd.DataFrame({
-        'Date': df_temp['Date'][start:end+1],
-        'Close': df_temp['Close'][start:end+1]
+        'Date': df_temp['Date'],
+        'Close': df_temp['Close']
     })
     rsi = pd.DataFrame({
-        'Date': df['Date'],
-        'RSI': cleaned_rsi
+        'Date': df_temp['Date'],
+        'RSI': df_temp['RSI']
         })
-    df.reset_index(drop=True, inplace=True)
-    rsi.reset_index(drop=True, inplace=True)
     stock_peaks = []
     stock_valleys = []
     rsi_peaks = []
@@ -166,33 +189,41 @@ def calc_return(df, divergence):
     return div_curve
 
 
-
-#Asks a user for a stock and sets up counting and list variables that will be useful later
-user_input = input("Enter Stock: ")
-user_input2 = int(input('Enter Period (in days): '))
+period = int(input('Enter Period (in days): '))
 buy_returns = [0] * 21
 bcount = [0] * 21
 sell_returns = [0] * 21
 scount = [0] * 21
 days = list(range(1,  22))
 
-
+#If loop is false, it asks the user for a stock and then calculates average returns for it
+#If loop is true, than it loops through all stocks in the csv and returns average returns for it
+def stock_iteration(loop):
+    stocks = []
+    if loop is False:
+        user_input = input("Enter Stock: ")
+        stocks.append(user_input)
+    else:
+        stocks = get_stock_list()
+    for stock in stocks:
+        df, rsi, divergences = identify_divergences(stock, period)
+        for divergence in divergences:
+            returns = calc_return(df, divergence)['Return']
+            for i in range(len(returns)):
+                if divergence['Flag'] == 1:
+                    buy_returns[i] += round(returns[i], 2)
+                    bcount[i] += 1
+                else:
+                    sell_returns[i] += round(returns[i], 2)
+                    scount[i] += 1
+    return df, rsi, divergences   
 
 # Takes all divergences found from user given stock and calculates mean buy and sell return for 21 days
-df, rsi, divergences = identify_divergences(user_input, user_input2)
-for divergence in divergences:
-    returns = calc_return(df, divergence)['Return']
-    for i in range(len(returns)):
-        if divergence['Flag'] == 1:
-            buy_returns[i] += returns[i] 
-            bcount[i] += 1
-        else:
-            sell_returns[i] += returns[i]
-            scount[i] += 1
-
-#Prints List of all divergences with start times, end times, and stock and rsi prices, and flag
+#For 1 stock through user input enter False, for looping through all stocks enter True
+df, rsi, divergences = stock_iteration(True)
+#Prints List of all divergences with start times, end times, and stock and rsi prices, and flag (only works if Loop is False)
 #print(divergences)
-#Prints return price for a specific divergence and days after specific divergence (i is a number asscoiated with a divergence in the divergences list)
+#Prints return price for a specific divergence and days after specific divergence (i is a number asscoiated with a divergence in the divergences list) (only works if Loop is False)
 #returns = calc_return(df, divergences[i])
 
 for i in range(len(buy_returns)):
@@ -209,15 +240,14 @@ sell_df = pd.DataFrame({
     "Days after Divergence": days,
     "Sell Return": sell_returns
 })
-
 # Displays 2 graphs: Days after Divergence (21 total) vs Mean Buy Return graph and Days after Divergence (21 total) vs Mean Sell Return graph
 sns.lineplot(data=buy_df, x='Days after Divergence', y='Buy Return', color='firebrick', ax=ax[0])
 sns.lineplot(data=sell_df, x='Days after Divergence', y='Sell Return', color='firebrick', ax=ax[1])
 
-# Uncomment to Graph Date vs Stock Price
-# sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
-# Uncomment to Graph Date vs RSI Value
-# sns.lineplot(data=rsi, x='Date', y='RSI', color='blue', ax=ax[1])
+# Uncomment to Graph Date vs Stock Price (Only works if Loop is False)
+#sns.lineplot(data=df, x='Date', y='Close', color='firebrick', ax=ax[0])
+# Uncomment to Graph Date vs RSI Value (Only works if Loop is False)
+#sns.lineplot(data=rsi, x='Date', y='RSI', color='blue', ax=ax[1])
 # (Make sure to double check subplot and axis values otherwise code will give an error)
 
 
