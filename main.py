@@ -220,7 +220,7 @@ def stock_iteration(loop):
 
 # Takes all divergences found from user given stock and calculates mean buy and sell return for 21 days
 #For 1 stock through user input enter False, for looping through all stocks enter True
-df, rsi, divergences = stock_iteration(True)
+df, rsi, divergences = stock_iteration(False)
 #Prints List of all divergences with start times, end times, and stock and rsi prices, and flag (only works if Loop is False)
 #print(divergences)
 #Prints return price for a specific divergence and days after specific divergence (i is a number asscoiated with a divergence in the divergences list) (only works if Loop is False)
