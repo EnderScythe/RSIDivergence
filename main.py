@@ -251,7 +251,6 @@ sns.lineplot(data=sell_df, x='Days after Divergence', y='Sell Return', color='fi
 # (Make sure to double check subplot and axis values otherwise code will give an error)
 
 
-
 sns.despine()
 plt.show()
 
