@@ -23,6 +23,7 @@ def get_stock_info(stock):
     for i in range(len(info)):
         if info[i][0] == stock:
             num = i
+            #Remove 21 when done testing
             dates = info[1][1:len(info[1])]
             stock_price = info[num][1:len(info[num])]
             for j in range(len(stock_price)):
@@ -218,11 +219,27 @@ def stock_iteration(loop):
                     scount[i] += 1
     return df, rsi, divergences   
 
+#Finds a divergence for a specific date given the divergences array and date of choice
+def find_divergence(divergences, date):
+    for divergence in divergences:
+        if divergence.get('End') == date:
+            return divergence
+    
+
 # Takes all divergences found from user given stock and calculates mean buy and sell return for 21 days
 #For 1 stock through user input enter False, for looping through all stocks enter True
 df, rsi, divergences = stock_iteration(False)
+
 #Prints List of all divergences with start times, end times, and stock and rsi prices, and flag (only works if Loop is False)
 #print(divergences)
+
+#Prints divergence for a specific date by replacing mm/dd/yy with a actual date (If no divergence is found on that date, then it will output 'None')
+#print(find_divergence(divergences, 'mm/dd/yy'))
+
+#Prints divergence for the last day on the csv (Again if no divergence is found on that date, then it will output 'None')
+#end_date = '6/16/23'
+#print(find_divergence(divergences, '6/16/23'))
+
 #Prints return price for a specific divergence and days after specific divergence (i is a number asscoiated with a divergence in the divergences list) (only works if Loop is False)
 #returns = calc_return(df, divergences[i])
 
